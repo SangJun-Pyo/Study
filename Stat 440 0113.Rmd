@@ -1,0 +1,121 @@
+---
+title: "Stat 440 0112"
+author: "Sangjun Pyo"
+date: "1/14/2022"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Bernoulli Distribution
+
+```{r }
+# simulate from Bernoulli(.5)
+set.seed(123)
+rbinom(5, size=1, prob=.5)
+
+```
+
+Conditional Probability Distribution
+
+Rejection Sampling
+
+Example: Beta Sampling
+
+```{r }
+# run the line below once if you do not have gridExtra installed
+# install.packages("gridExtra")
+library(gridExtra)
+library(ggplot2)
+
+xset <- seq(-.1, 1.1, .001)
+a3dat <- data.frame(x=xset,y=dbeta(xset, 3, 3))
+a10dat <- data.frame(x=xset,y=dbeta(xset, 10, 10))
+a100dat <- data.frame(x=xset,y=dbeta(xset, 100, 100))
+p1 <- ggplot(data=a3dat, mapping=aes(x=x, y=y)) +
+  geom_line() + ggtitle("Alpha=3") + ylab("density") +
+  geom_vline(xintercept=0.5,color="blue")
+p2 <- ggplot(data=a10dat, mapping=aes(x=x, y=y)) +
+  geom_line() + ggtitle("Alpha=10") + ylab("density") +
+  geom_vline(xintercept=0.5,color="blue")
+p3 <- ggplot(data=a100dat, mapping=aes(x=x, y=y)) +
+  geom_line() + ggtitle("Alpha=100") + ylab("density") +
+  geom_vline(xintercept=0.5,color="blue")
+
+grid.arrange(p1, p2, p3, ncol=1)
+```
+
+```{r }
+beta_rejection_sampling = function(n, alpha) {
+  #' Perform beta rejection sampling
+  #' @param n output sample size
+  #' @param alpha parameter
+  # set alpha value and calculate constant c
+  
+  c <- (
+    gamma(2*alpha) / (gamma(alpha)**2) *
+     0.5^(2 * (alpha - 1))
+  )
+
+# initialize a vector of samples
+x_sample <- numeric(n)
+current_n <- 1
+total_samples <- 0
+
+# while loop for all samples
+while(current_n <= n) {
+  
+  # generate uniform proposal
+  y <- runif(1, min=0, max=1)
+  total_samples <- total_samples + 1
+
+  # determine if we accept sample by Bernoulli sampling
+  a <- rbinom(1, 1, dbeta(y, alpha, alpha) / c)
+
+  # if we accept the sample, insert it to results
+  if(a == 1) {
+    x_sample[current_n] = y
+    current_n <- current_n + 1
+  }
+}
+
+# return distribution samples and total proposed
+list(
+  x_sample,
+  total_samples
+  )
+}
+
+# run algorithm and plot results
+rejection_results = beta_rejection_sampling(1000, 3)
+
+ggplot() +
+  geom_histogram(data=data.frame(x=rejection_results[[1]]),
+                  mapping=aes(x=x, y=..density..),
+                  bins=30, fill="white", color="black") +
+geom_line(data=a3dat, color="blue", mapping=aes(x=x, y=y))
+acceptance_rate = 1000 / rejection_results[[2]]
+rejection_rate = 1 - acceptance_rate
+c(acceptance_rate, rejection_rate)
+```
+```{r}
+new_rejection_results = beta_rejection_sampling(1000,alpha=10)
+
+ggplot() +
+  geom_histogram(
+    data=data.frame(x=new_rejection_results[[1]]),
+    mapping=aes(x=x, y=..density..),
+    bins=30, fill="white", color="black"
+) +
+geom_line(data=a10dat, color="blue", mapping=aes(x=x, y=y))
+
+new_acceptance_rate = 1000 / new_rejection_results[[2]]
+new_rejection_rate = 1 - new_acceptance_rate
+c(new_acceptance_rate, new_rejection_rate)
+```
+
+
