@@ -1,0 +1,198 @@
+---
+title: "Stat 440 0111"
+author: "Sangjun Pyo"
+date: "5/19/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Inverse Transformation Sampling
+
+Simulating random variables is the foundation of countless methods in statistical computing. 
+Many things we do in this class will rely on the ability to simulate random variables. 
+By the end of this lesson, you should be able to:
+
+• Understand how computers generate approximately random numbers.
+• Learn how to use inverse transformation to generate samples from continuous and discrete random       variables.
+• Apply these techniques to R examples.
+
+## Uniform Distribution
+
+```{r }
+# compute CDF of Unif(0, 1)
+punif(c(-2, 0, 0.27, 0.64, 1, 2), min=0, max=1)
+
+# compute PDF of Unif(0, 1)
+dunif(c(-2, 0, 0.27, 0.64, 1, 2), min=0, max=1)
+
+# compute quantile of Unif(0, 1)
+qunif(c(-2, 0, 0.27, 0.64, 1, 2), min=0, max=1)
+
+# Uncomment the line below and run once
+# if you don't have ggplot2 installed.
+
+# install.packages("ggplot2")
+
+library(ggplot2)
+# plot CDF of Unif(0, 1) distribution
+xset <- seq(-.5, 1.5, .001)
+udat <- data.frame(x=xset,y=punif(xset, min=0, max=1))
+ggplot(data=udat,mapping=aes(x=x, y=y)) +
+  geom_line() + ylab("CDF") + ggtitle("CDF of Unif(0, 1)")
+```
+
+## Pseudo-Random Numbers
+
+Simulating random numbers on computers can be hard for two key reasons:
+
+1. Computers are deterministic: computer code follows written instructions exactly, 
+and it’s impossible for computers to generate truly random numbers.
+
+2. Computers are finite: computers can only approximate real numbers, and
+they cannot generate exact real numbers (e.g., irrational numbers like $\pi$)
+
+To overcome these issues, computers use pseudo-random number generation (PRNG). 
+These are deterministic algorithms that start with an initial value (called a seed value) and deterministically output numbers that are approximately random. 
+Most PRNG algorithms generate uniform random numbers;
+here is R’s PRNG to generate from Unif(0, 1).
+
+```{r }
+# set PRNG seed
+set.seed(123)
+# generate 3 pseudo-random numbers from Unif(0, 1)
+runif(3, min=0, max=1)
+
+```
+
+The PRNG output is entirely determined by the seed value. If we use the
+same seed, we get the same output:
+
+```{r}
+set.seed(123)
+runif(3, min=0, max=1)
+```
+
+If we use a different seed, we get a different output:
+
+```{r}
+set.seed(456)
+runif(3, min=0, max=1)
+```
+
+
+## Inverse Transformation Method
+
+For the purposes of this class, we will start our analyses assuming the ability
+to generate pseudo-random numbers from Unif(0, 1). This allows us to use
+the inverse transformation method, the focus of this lesson.
+
+## Example 1: Exponential Distribution
+
+```{r}
+# Step 1: generate uniform samples
+unif_samples <- runif(1000, min=0, max=1)
+# Step 2: apply inverse transformation
+exp_samples <- -log(1 - unif_samples) / 2
+
+# plot histogram of samples along with true density
+ggplot(data=data.frame(x=exp_samples)) +
+  # create histogram of samples
+  geom_histogram(mapping=aes(x=x, y=..density..),
+                fill="white", color="black", bins=30) +
+  # add true density using 'dexp' function
+  geom_line(data=data.frame(x=seq(0, 3, .001),
+                            y=dexp(seq(0, 3, .001), rate=2)),
+            mapping=aes(x=x, y=y),color="blue") +
+  ggtitle("Exp(lambda=2) simulation vs truth")
+```
+
+## Example 2: Vaccination Rate
+
+```{r}
+# probability mass function (PMF) as a vector
+dosage_probs = c(.218, .143, .437, .202)
+
+# calculate cumulative sum of PMF values
+cumsum(dosage_probs)
+
+```
+
+We plot the true dosage CDF below. Note that our CDF is NOT continuous,
+so it is not directly invertible.
+
+```{r}
+# plot the true CDF
+ggplot(data=data.frame(x=c(-1, 0, 1, 2, 3, 4),
+                        y=cumsum(c(0, dosage_probs, 0))),
+      mapping=aes(x=x,y=y)) +
+  geom_step(direction="hv") +
+  ggtitle("Dosage count CDF") +
+  ylab("CDF")
+
+```
+
+However, we can still use inverse transformation. First, we define our CDF
+and quantile functions as piece-wise linear functions:
+
+```{r}
+dosage_cdf = function(x) {
+  #' CDF for dosage count distribution
+  #' @param x input value
+  if (x < 0) {
+    0
+  } else if (x < 1) {
+    .218
+  } else if (x < 2) {
+    .361
+  } else if (x < 3) {
+    .798
+  } else {
+    1
+  }
+}
+
+dosage_inv_cdf = function(v) {
+  #' Inverse CDF for dosage count distribution
+  #' @param v input value
+  if (v < .218) {
+    0
+  } else if (v < .361) {
+    1
+  } else if (v < .798) {
+    2
+  } else {
+    3
+  }
+}
+```
+
+In the examples above, we wrote out all the cases explicitly. Here’s another
+implementation using which(); this may be helpful when there are too many
+cases to enumerate explicitly
+
+```{r}
+dosage_inv_cdf_alt = function(v) {
+  #' Inverse CDF for dosage count distribution without cases
+  #' @param v input value
+  which(v < cumsum(dosage_probs))[1] - 1
+}
+```
+
+Next, we calculate the inverse CDF by applying our function to uniform
+samples:
+
+```{r}
+# step 1: generate uniform samples
+dosage_unif_sams = runif(1000, min=0, max=1)
+
+# step 2: apply inverse transformation
+dosage_dist_sams = sapply(dosage_unif_sams,dosage_inv_cdf)
+
+# summarize results in a table
+table(dosage_dist_sams)/1000
+```
+
+This distribution based on simulations is very similar to our target distribution, so the method works as expected.
