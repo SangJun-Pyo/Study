@@ -1,0 +1,186 @@
+---
+title: "Stat 440 0120"
+author: "Sangjun Pyo"
+date: "5/21/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Multivariate Normal Distribution
+
+In this lecture, we focus on how to sample from a multivariate normal distribution. By the end of this lesson, you should be able to:
+
+• Understand how to simulate a multivariate normal random vector from independent univariate normal distributions.
+• Apply eigendecomposition to sample from a multivariate normal distribution in R.
+• Apply Cholesky decomposition to sample from a multivariate normal distribution in ‘R“.
+
+
+The multivariate normal distribution plays a crucial role in many statistical models, such as multivariate linear regression and its many variants. This distribution has a rich history in the origins of modern statistics. For example, as Galton discovered in 1886 (source: https://www.jstor.org/stable/ 2841583) and visualized below, the joint distribution of parent height and adult child height can be effectively modeled as a 2-dimensional multivariate normal distribution.
+
+
+```{r }
+# define sample size
+n <- 10000
+
+# define dimension
+d <- 5
+
+# define the mean vector
+mu <- rep(0,times=d); print(mu)
+
+# define the covariance matrix
+tau <- 1
+dist_for_sig <- outer(1:d,1:d,FUN="-"); print(dist_for_sig)
+
+Sigma <- exp(-tau*abs(dist_for_sig)); print(round(Sigma, 3))
+
+```
+
+## Eigendecomposition
+
+Since $Σ$ is positive definite, it admits an eigendecomposition:
+
+$$ \Sigma = PΛP^T $$
+where P is orthogonal ($P^TP = I$, where I is a diagonal of ones) whose
+columns make up the eigenvectors and Λ is a diagonal matrix of the corresponding eigenvalues. 
+Recall that for any eigenvalue $λ_i$ and eigenvector ei for $i ∈ {1, . . . , d}$, we have:
+
+$$ Σe_i = λe_i $$
+
+Therefore:
+$$ Λ = diag(λ1, . . . , λd), P =(e_1, e_2, · · · ,e_n), P^{-1} = P^T $$
+In this case $ Λ^{1/2} $ is just the square-root of the diagonal and we can define the square-root matrix $Σ^{1/2}$ as follows:
+
+$$(Σ^{1/2})^T = A = Λ^{1/2}P^T$$
+In R we can use the eigen function to perform eigendecomposition. Below are
+the R codes showing how to sample from Nd($µ$, $Σ$) after applying eigendecomposition to $Σ$.
+
+```{r}
+mvrnorm_eig <- function(n,mu,Sigma){
+  #' sample from N_d(mu, Sigma) with eigendecomposition
+  #' @param n sample size
+  #' @param mu mean vector
+  #' @param Sigma covariance matrix
+  
+  # apply eigendecomposition to Sigma
+  Sig_eig <- eigen(Sigma)
+
+  # determine the dimension
+  p <- length(mu)
+
+  # find the square-root matrix
+  A <- diag(sqrt(Sig_eig$values)) %*% t(Sig_eig$vectors)
+
+  # sample from N_d(mu, Sigma)
+  X <- mu + t(A)%*%matrix(rnorm(n*p),nrow=p,ncol=n)
+
+  # return the sample
+  return(t(X))
+}
+
+X_eig<-mvrnorm_eig(n,mu,Sigma)
+
+```
+
+Let’s compare the true mean vector µ and covariance matrix Σ with the
+sample mean vector and covariance matrix based on 10,000 simulations. As
+expected, the simulation-based values are not the same as, but quite similar to
+the true values
+
+```{r}
+mu
+colMeans(X_eig)
+round(Sigma, 3)
+round(cov(X_eig), 3)
+```
+
+## Singular Value Decomposition
+
+Because $Σ$ is positive definite, we can use another matrix factorization technique called singular value decomposition (SVD) to obtain the square-root matrix and then to simulate multivariate normal vectors. Due to the important role of SVD, we will spend two lectures on SVD near the end of the semester. For today’s discussion, we only show that we can use the svd function in R to
+perform SVD.
+
+```{r}
+mvrnorm_svd <- function(n,mu,Sigma){
+  #' sample from N_d(mu, Sigma) with SVD
+  #' @param n sample size
+  #' @param mu mean vector
+  #' @param Sigma covariance matrix
+  
+  # apply SVD to Sigma
+  Sig_svd <- svd(Sigma)
+
+  # determine the dimension
+  p <- length(mu)
+
+  # find the square-root matrix
+  A <- diag(sqrt(Sig_svd$d)) %*% t(Sig_svd$v)
+
+  # sample from N_d(mu, Sigma)
+  X <- mu + t(A)%*%matrix(rnorm(n*p),nrow=p,ncol=n)
+
+  # return the sample
+  return(t(X))
+}
+
+X_svd<-mvrnorm_svd(n,mu,Sigma)
+```
+
+Once again, let’s compare the true values of µ and Σ with their counterparts
+based on 10,000 simulations.
+
+```{r}
+mu
+colMeans(X_svd)
+round(Sigma, 3)
+round(cov(X_svd), 3)
+```
+
+
+## Cholesky Decomposition
+
+Another way of obtaining the square-root matrix $Σ^{1/2}$ is Cholesky decomposition:
+
+$$ Σ = Σ^{1/2}(Σ^{1/2})^T = Q^TQ, $$
+where Q is an upper triangular matrix, that is, a matrix that is only nonzero on
+the diagonal and above the diagonal. Here Q can be used as a square-root
+matrix of $Σ$.
+  In R we can use the chol function to perform Cholesky decomposition.
+Below are the R codes showing how to sample from $Nd(µ, Σ)$ after applying
+Cholesky decomposition to $Σ$.
+
+```{r}
+mvrnorm_chol<-function(n,mu,Sigma){
+  #' sample from N_d(mu, Sigma) with Cholesky decomposition
+  #' @param n sample size
+  #' @param mu mean vector
+  #' @param Sigma covariance matrix
+  
+  # apply Cholesky decomposition to Sigma
+  Sig_chol<-chol(Sigma)
+
+  # determine the dimension
+  p<-length(mu)
+
+  # sample from N_d(mu, Sigma)
+  X <- mu + t(Sig_chol)%*%matrix(rnorm(n*p),nrow=p,ncol=n)
+
+  # return the sample
+  return(t(X))
+}
+
+X_chol<-mvrnorm_chol(n,mu,Sigma)
+
+```
+
+  Once again, let’s compare the true values of µ and Σ with their counterparts
+based on 10,000 simulations.
+
+```{r}
+mu
+colMeans(X_chol)
+round(Sigma, 3)
+round(cov(X_chol), 3)
+```
