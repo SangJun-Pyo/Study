@@ -22,7 +22,7 @@ Calculating integrals is of the most common computational problems in mathematic
 
 To understand how simulation can help, we need to review some connections between expected values and integrals.
 
-## Monte Carlo Integra
+## Monte Carlo Integral
 
 Algorithm:
 1. Choose a random variable with density f(x) that allows for easy sample simulation.
